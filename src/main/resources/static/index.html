@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Result Generator</title>
+  <style>
+    :root {
+      /* light mode defaults */
+      --primary-color: #4a90e2;
+      --secondary-color: #f5f7fa;
+      --accent-color: #2c3e50;
+      --success-color: #2ecc71;
+      --container-bg: #ffffff;
+      --field-bg: #ffffff;
+      --field-border: #e1e8ed;
+      --note-bg: rgba(74, 144, 226, 0.06);
+      --page-bg: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+
+    /* dark mode overrides */
+    body.dark {
+      --primary-color: #6fb3ff;
+      --secondary-color: #0f1720;
+      --accent-color: #e6eef8;
+      --success-color: #3bd27a;
+      --container-bg: #111419;
+      --field-bg: #0f1316;
+      --field-border: #22303a;
+      --note-bg: rgba(255,255,255,0.03);
+      --page-bg: linear-gradient(135deg, #0b0f12 0%, #101416 100%);
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 40px;
+      background: var(--page-bg);
+      min-height: 100vh;
+      color: var(--accent-color);
+      transition: background 250ms ease, color 250ms ease;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: var(--container-bg);
+      padding: 32px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      transition: background 250ms ease, color 250ms ease;
+    }
+
+    h1 {
+      color: var(--primary-color);
+      margin-top: 0;
+      font-size: 2.5em;
+      border-bottom: 3px solid var(--primary-color);
+      padding-bottom: 10px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 240px;
+      padding: 12px;
+      border: 2px solid var(--field-border);
+      border-radius: 8px;
+      background: var(--field-bg);
+      color: var(--accent-color);
+      font-family: monospace;
+      font-size: 14px;
+      transition: border-color 0.3s ease, background 0.25s ease, color 0.25s ease;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary-color);
+    }
+
+    .row {
+      margin: 20px 0;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--accent-color);
+      font-weight: 500;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--field-border);
+      border-radius: 8px;
+      font-size: 14px;
+      background: var(--field-bg);
+      color: var(--accent-color);
+      transition: border-color 0.3s ease, background 0.25s ease, color 0.25s ease;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--primary-color);
+    }
+
+    button {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s ease, background-color 0.2s ease;
+    }
+
+    button:hover {
+      background: #357abd;
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    code {
+      background: var(--secondary-color);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .note {
+      background: var(--note-bg);
+      border-left: 4px solid var(--primary-color);
+      padding: 16px;
+      border-radius: 0 8px 8px 0;
+      margin-top: 24px;
+      color: var(--accent-color);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Result Generator</h1>
+    <p>Paste your CSV data below with the following header structure:</p>
+    <code>ID,Name,Subject1,Subject2,...</code>
+    <p>Example:</p>
+    <code>ID,Name,Math,Science,English<br>S1,John Doe,85,78,92</code>
+
+    <form method="post" action="/submit">
+      <div class="row">
+        <label for="csvData">CSV Data</label>
+        <textarea id="csvData" name="csvData" placeholder="Paste your CSV data here..."></textarea>
+      </div>
+
+      <div class="row">
+        <div style="display:flex;gap:12px;align-items:center">
+          <button id="btnGenerate" type="button">Generate</button>
+          <button id="btnAddRow" type="button">Add Row</button>
+          <button id="btnDeleteRow" type="button">Delete Row</button>
+          <button id="btnExport" type="button">Export to Excel</button>
+          <button id="btnSave" type="button">Save</button>
+          <button id="btnDark" type="button">Dark Mode</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="note">
+      <strong>Note:</strong> 
+      - "Save" writes JSON to the <code>data/</code> folder with a timestamped filename.<br/>
+      - "Export to Excel" writes <code>data/result.xlsx</code> that you can download from the server.
+    </div>
+  </div>
+  <script>
+    (function(){
+      const textarea = document.getElementById('csvData');
+      const btnGenerate = document.getElementById('btnGenerate');
+      const btnAddRow = document.getElementById('btnAddRow');
+      const btnDeleteRow = document.getElementById('btnDeleteRow');
+      const btnSave = document.getElementById('btnSave');
+      const btnExport = document.getElementById('btnExport');
+      const btnDark = document.getElementById('btnDark');
+
+      function fetchPreview() {
+        const csv = textarea.value;
+        if (!csv.trim()) { alert('Please paste CSV data first'); return; }
+        btnGenerate.disabled = true;
+        fetch('/api/preview', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: 'csvData='+encodeURIComponent(csv) })
+          .then(r=>r.text())
+          .then(html => showPreviewHtml(html))
+          .catch(err=>alert('Preview error: '+err))
+          .finally(()=>btnGenerate.disabled=false);
+      }
+
+      function showPreviewHtml(html) {
+        const container = document.querySelector('.container');
+        const old = document.getElementById('livePreview');
+        if (old) old.remove();
+        const prev = document.createElement('div');
+        prev.id = 'livePreview';
+        prev.style.marginTop = '20px';
+        prev.innerHTML = html;
+        container.appendChild(prev);
+      }
+
+      btnGenerate.addEventListener('click', fetchPreview);
+
+      btnAddRow.addEventListener('click', ()=>{
+        const lines = textarea.value.split(/\r?\n/).filter(Boolean);
+        if (lines.length === 0) { alert('Please paste header first'); return; }
+        const header = lines[0].split(',').map(s=>s.trim());
+        const blank = header.map((h,i)=> i<2 ? (i===0? 'NEW_ID':'New Name') : '0').join(',');
+        textarea.value = textarea.value.trim() + '\n' + blank + '\n';
+      });
+
+      btnDeleteRow.addEventListener('click', ()=>{
+        const lines = textarea.value.split(/\r?\n/);
+        if (lines.length <= 1) { alert('No data rows to delete'); return; }
+        let idx = lines.length-1; while (idx>0 && lines[idx].trim()==='') idx--; if (idx<=0) { alert('No data rows to delete'); return; }
+        lines.splice(idx,1);
+        textarea.value = lines.join('\n');
+      });
+
+      btnSave.addEventListener('click', ()=>{
+        const csv = textarea.value;
+        if (!csv.trim()) { alert('Please paste CSV data first'); return; }
+        btnSave.disabled = true;
+        btnSave.textContent = 'Saving...';
+        const body = 'csvData='+encodeURIComponent(csv);
+        fetch('/api/save', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body })
+          .then(r=>r.json())
+          .then(j=>{
+            if (j.ok) {
+              alert('Results saved successfully!\nFile: ' + (j.path || 'data/results_*.json'));
+            } else {
+              alert('Save failed: ' + (j.error || 'Unknown error'));
+            }
+          })
+          .catch(err=>alert('Save error: '+err.message))
+          .finally(()=>{
+            btnSave.disabled = false;
+            btnSave.textContent = 'Save';
+          });
+      });
+
+      btnExport.addEventListener('click', ()=>{
+        const csv = textarea.value;
+        if (!csv.trim()) { alert('Please paste CSV data first'); return; }
+        btnExport.disabled = true;
+        btnExport.textContent = 'Exporting...';
+        const body = 'csvData='+encodeURIComponent(csv);
+        fetch('/api/export', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body })
+          .then(r=>r.json())
+          .then(j=>{
+            if (j.ok) {
+              alert('Excel exported!\nFile: ' + (j.path || 'data/result.xlsx'));
+            } else {
+              alert('Export failed: ' + (j.error || 'Unknown error'));
+            }
+          })
+          .catch(err=>alert('Export error: '+err.message))
+          .finally(()=>{
+            btnExport.disabled = false;
+            btnExport.textContent = 'Export to Excel';
+          });
+      });
+
+      let dark=false;
+      btnDark.addEventListener('click', ()=>{
+        dark = !dark;
+        document.body.classList.toggle('dark', dark);
+        btnDark.textContent = dark ? 'Light Mode' : 'Dark Mode';
+      });
+
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: result-generator
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      # PORT is automatically set by Render - don't override it
+      - key: JAVA_OPTS
+        value: -Xmx512m
+
